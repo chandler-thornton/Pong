@@ -3,6 +3,9 @@
 #include <iostream>
 #include <random>
 
+const int window_width = 1000;
+const int window_height = 800;
+
 class Ball
 {
 private:
@@ -11,6 +14,14 @@ private:
     sf::CircleShape c;
 
 public:
+    Ball()
+    {
+        pos.x = 0;
+        pos.y = 0;
+        vel.x = 0;
+        vel.y = 0;
+    }
+
     Ball(float pos_x, float pos_y, float vel_x, float vel_y)
     {
         pos.x = pos_x;
@@ -21,10 +32,10 @@ public:
 
     sf::Vector2f get_position() { return pos; }
 
-    void set_position(float pos_x, float pos_y) 
-    { 
-        pos.x = pos_y; 
-        pos.y = pos_y; 
+    void set_position(float pos_x, float pos_y)
+    {
+        pos.x = pos_y;
+        pos.y = pos_y;
     }
 
     void set_velocity(float vel_x, float vel_y)
@@ -33,21 +44,51 @@ public:
         vel.y = vel_y;
     }
 
-    void render_ball(sf::RenderWindow& window) 
+    void move_ball()
+    {
+        pos.x += vel.x;
+        pos.y += vel.y;
+    }
+
+    void render_ball(sf::RenderWindow& window)
     {
         c.setPosition(pos);
         c.setRadius(8);
         window.draw(c);
     }
+
+    void is_touching_wall()
+    {
+        if (int(pos.y) == 0 || int(pos.y) == 800)
+        {
+            std::cout << vel.y;
+            vel.y = -1.f * vel.y;
+        }
+    }
+
+    void off_screen(Ball& b)
+    {
+        if (pos.x < 0 || pos.x > 1000)
+        {
+            b.set_position(window_width / 2, window_height / 2);
+        }
+    }
+
 };
 
-class Paddle 
+class Paddle
 {
 private:
     sf::Vector2f pos;
     sf::RectangleShape r;
 
 public:
+    Paddle()
+    {
+        pos.x = 0;
+        pos.y = 0;
+    }
+
     Paddle(float pos_x, float pos_y)
     {
         pos.x = pos_x;
@@ -58,24 +99,13 @@ public:
 
     void set_position(float pos_x, float pos_y)
     {
-        pos.x += pos_y;
+        pos.x += pos_x;
         pos.y += pos_y;
     }
 
     void move_paddle(float move_y)
     {
         pos.y += move_y;
-    }
-
-    void ai_paddle(Ball& b)
-    {
-        //Generate random number from -10 to 10
-        std::random_device rd;
-        std::mt19937 mt(rd());
-        std::uniform_int_distribution<> dist(-10, 10);
-
-        //Set position = ball position + random offset number
-        pos.y += ((dist(mt)) + b.get_position().y);
     }
 
     void render_paddle(sf::RenderWindow& window)
@@ -90,67 +120,81 @@ public:
 class Game
 {
 private:
-    int lscore;
-    int rscore;
-    int winner;
+    int ai_score = 0;
+    int player_score = 0;
+    int winner = 2;
+
+    Paddle lpaddle;
+    Paddle rpaddle;
+    Ball ball;
 
 public:
-    Game(Paddle& lpaddle, Paddle& rpaddle, Ball& ball, sf::RenderWindow& window) 
+    Game() 
     {
-        lscore = 0;
-        rscore = 0;
-        winner = 0;
-    };
+        ball.set_position(window_width / 2, window_height / 2);
+        ball.set_velocity(0.2, 0.2);
+
+        lpaddle.set_position(100, 300);
+        rpaddle.set_position(900, 300);
+    }
+
+    void game_loop(sf::RenderWindow& window)
+    {
+        while (window.isOpen())
+        {
+            // Process input events
+            sf::Event event;
+            while (window.pollEvent(event))
+            {
+                // Close window: exit
+                if (event.type == sf::Event::Closed) window.close();
+
+                if (event.type == sf::Event::KeyPressed)
+                {
+                    //Close window when escape key pressed
+                    if (event.key.code == sf::Keyboard::Escape) window.close();
+
+                    //Right paddle manual controls
+                    else if (event.key.code == sf::Keyboard::Up) rpaddle.move_paddle(-25);
+
+                    else if (event.key.code == sf::Keyboard::Down) rpaddle.move_paddle(25);
+
+                    //Left paddle manual controls
+                    else if (event.key.code == sf::Keyboard::W) lpaddle.move_paddle(-25);
+
+                    else if (event.key.code == sf::Keyboard::S) lpaddle.move_paddle(25);
+                }
+            }
+
+            ball.is_touching_wall();
+            ball.off_screen(ball);
+            std::cout << ball.get_position().y << std::endl;
+            ball.move_ball();
+
+            // Clear screen
+            window.clear();
+
+            //Renders
+            ball.render_ball(window);
+            lpaddle.render_paddle(window);
+            rpaddle.render_paddle(window);
+
+            // Update the window
+            window.display();
+        }
+        winner = (ai_score > player_score) ? 0 : 1;
+    }
 
     
-
-    ~Game() {};
 };
+
 
 int main()
 {
-    int window_width = 1000;
-    int window_height = 800;
+    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "SFML window");
 
-	sf::RenderWindow window(sf::VideoMode(window_width, window_height), "SFML window");
+    std::vector<Game> games;
 
-    Ball ball(window_width / 2, window_height / 2, 0, 0);
-
-    Paddle lpaddle(100, 300);
-    Paddle rpaddle(900, 300);
-
-    while (window.isOpen())
-    {
-        // Process events
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            // Close window: exit
-            if (event.type == sf::Event::Closed) window.close();
-
-            if (event.type == sf::Event::KeyPressed)
-            {
-                if (event.key.code == sf::Keyboard::Escape) window.close();
-
-                else if (event.key.code == sf::Keyboard::Up) rpaddle.move_paddle(-10);
-
-                else if (event.key.code == sf::Keyboard::Down) rpaddle.move_paddle(10);
-
-                else if (event.key.code == sf::Keyboard::W) lpaddle.move_paddle(-10);
-
-                else if (event.key.code == sf::Keyboard::S) lpaddle.move_paddle(10);
-            }
-        }
-
-        // Clear screen
-        window.clear();
-
-        ball.render_ball(window);
-        lpaddle.render_paddle(window);
-        rpaddle.render_paddle(window);
-
-        // Update the window
-        window.display();
-    }
-
+    games.push_back(Game());
+    games[games.size() - 1].game_loop(window);
 }
