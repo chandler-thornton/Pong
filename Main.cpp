@@ -66,6 +66,33 @@ public:
         }
     }
 
+    bool is_touching_paddle(float lpaddle_y, float rpaddle_y)
+    {
+        if (int(pos.x) > 100 && int(pos.x) < 112 && int(pos.y) > lpaddle_y && int(pos.y) < (lpaddle_y + 180))
+        {
+            std::cout << "Left paddle collision" << std::endl;
+            return true;
+        }
+        if (int(pos.x) > 900 && int(pos.x) < 912 && int(pos.y) > rpaddle_y && int(pos.y) < (rpaddle_y + 180))
+        {
+            std::cout << "Right paddle collision" << std::endl;
+            return true;
+        }
+        return false;
+    }
+
+    void collision_physics(float paddle_y)
+    {
+        float max_angle = 0.78f;
+        float relative_intersection = ((paddle_y) + 90.0f - pos.y);
+        std::cout << "Intersection: " << relative_intersection;
+        float normal_relative_intersection = relative_intersection / 90.0f;
+        float angle = normal_relative_intersection * max_angle;
+
+        vel.x = vel.x * cos(angle) * -1;
+        vel.y = vel.y * sin(angle) * -1;
+    }
+
     void off_screen(Ball& b)
     {
         if (pos.x < 0 || pos.x > 1000)
@@ -108,6 +135,12 @@ public:
         pos.y += move_y;
     }
 
+    void ai_paddle(Ball& b, int offset)
+    {
+        //AI paddle midpoint = ball position
+        pos.y = b.get_position().y - 90 + offset;
+    }
+
     void render_paddle(sf::RenderWindow& window)
     {
         r.setPosition(pos);
@@ -123,6 +156,7 @@ private:
     int ai_score = 0;
     int player_score = 0;
     int winner = 2;
+    int last_hit = 0;
 
     Paddle lpaddle;
     Paddle rpaddle;
@@ -132,7 +166,7 @@ public:
     Game() 
     {
         ball.set_position(window_width / 2, window_height / 2);
-        ball.set_velocity(0.2, 0.2);
+        ball.set_velocity(0.2f, 0.2f);
 
         lpaddle.set_position(100, 300);
         rpaddle.set_position(900, 300);
@@ -167,9 +201,36 @@ public:
             }
 
             ball.is_touching_wall();
+            if (ball.is_touching_paddle(lpaddle.get_position().y, rpaddle.get_position().y))
+            {
+                if (ball.get_position().x < 400)
+                {
+                    ball.collision_physics(lpaddle.get_position().y);
+                    last_hit = 0;
+                }
+                else
+                {
+                    ball.collision_physics(rpaddle.get_position().y);
+                    last_hit = 1;
+                }
+            }
             ball.off_screen(ball);
-            std::cout << ball.get_position().y << std::endl;
+            std::cout << ball.get_position().x << ", " << ball.get_position().y  << std::endl;
             ball.move_ball();
+            if (last_hit == 1)
+            {
+                std::random_device dev;
+                std::mt19937 rng(dev());
+                std::uniform_int_distribution<> offset(-50, 50);
+
+                int ai_offset = offset(rng);
+
+                lpaddle.ai_paddle(ball, ai_offset);
+            }
+            else
+            {
+                lpaddle.ai_paddle(ball, 0);
+            }
 
             // Clear screen
             window.clear();
